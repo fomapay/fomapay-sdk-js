@@ -1,0 +1,38 @@
+{
+  "name": "@fomapay/sdk-js",
+  "version": "0.1.0",
+  "description": "SDK officiel FomaPay pour JavaScript / TypeScript — paiements FomaPay Direct et Mobile Money (RDC).",
+  "license": "MIT",
+  "keywords": ["fomapay", "payments", "mobile money", "m-pesa", "orange money", "airtel money", "rdc", "congo"],
+  "repository": { "type": "git", "url": "https://github.com/fomapay/fomapay-sdk-js.git" },
+  "type": "module",
+  "sideEffects": ["./dist/index.*"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "unpkg": "./dist/fomapay.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  }
+}

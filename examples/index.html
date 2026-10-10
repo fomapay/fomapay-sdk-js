@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FomaPay — exemple d'intégration</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 560px; margin: 12vh auto; padding: 0 20px; color: #0a1c36; }
+      input { width: 100%; padding: 10px; margin: 6px 0 18px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; box-sizing: border-box; }
+      button { padding: 12px 20px; border: 0; border-radius: 12px; background: #032b56; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+      pre { background: #f1f5f9; padding: 14px; border-radius: 12px; white-space: pre-wrap; word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <h1>Boutique de démonstration</h1>
+    <p>Collez une clé publique de <b>test</b> (FomaPay Business › Développeurs, mode test), puis payez.</p>
+    <label>Clé publique <input id="key" placeholder="pk_test_…" /></label>
+    <button id="pay">Payer 25,00 $</button>
+    <pre id="out">En attente…</pre>
+
+    <!-- Après `npm run build`, servir la racine du dépôt : `npx serve .` puis ouvrir /examples/ -->
+    <script src="../dist/fomapay.js"></script>
+    <script>
+      document.getElementById('pay').addEventListener('click', async () => {
+        const out = document.getElementById('out');
+        try {
+          const fomapay = new FomaPay({
+            publicKey: document.getElementById('key').value.trim(),
+            apiUrl: 'http://localhost:8080', // gateway locale ; à retirer en production
+          });
+          const payment = await fomapay.checkout({
+            amount: 25,
+            currency: 'USD',
+            orderId: 'CMD-8921',
+            customization: { description: 'Commande #CMD-8921' },
+          });
+          out.textContent = 'Payé ✔  ' + payment.reference + ' — ' + payment.status;
+        } catch (error) {
+          out.textContent = error.message;
+        }
+      });
+    </script>
+  </body>
+</html>
