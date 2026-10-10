@@ -6,9 +6,13 @@ Zéro dépendance, entièrement typé, deux modes de paiement :
 - **FomaPay Direct** — le client paie depuis son portefeuille FomaPay (QR code). Disponible dès le **Niveau 0**, sans aucun document.
 - **Mobile Money** — M-Pesa, Orange Money, Airtel Money. Réservé aux comptes vérifiés (**Niveau 1+**).
 
-```bash
-npm install @fomapay/sdk-js
-```
+## Intégration en 3 étapes
+
+1. **Installer** : `npm install @fomapay/sdk-js`
+2. **Encaisser** dans la page avec votre clé publique `pk_…` : `fomapay.checkout({ amount, currency, orderId })`
+3. **Confirmer** sur votre serveur avec la clé secrète `sk_…` : webhook `payment.succeeded` vérifié par `webhooks.constructEvent`
+
+La clé publique ne sait que créer et suivre un paiement ; tout le reste (liste, solde, retraits) exige la clé secrète, qui ne quitte jamais votre serveur.
 
 ## Navigateur
 
@@ -24,6 +28,8 @@ try {
     orderId: 'CMD-8921',
     customer: { name: 'John Doe', phone: '+243810000000' },
     paymentModes: ['fomapay_direct', 'mobile_money'],
+    callbackUrl: 'https://dzoket.cd/commande/CMD-8921',
+    metadata: { custom_field: 'valeur' },
     customization: { title: 'Dzoket Store', description: 'Commande #CMD-8921', logoUrl: 'https://dzoket.cd/logo.png' },
   });
   console.log('Transaction réussie :', payment.transactionId);
@@ -80,6 +86,22 @@ await fomapay.payouts.create({ amount: 100, currency: 'USD', operator: 'mpesa', 
 ```
 
 `webhooks.verify()` contrôle le HMAC-SHA256 en temps constant et rejette tout événement de plus de 5 minutes (anti-rejeu).
+Sans client : `import { Webhook } from '@fomapay/sdk-js/server'` puis `Webhook.verify(corpsBrut, signature, 'whsec_…')`.
+
+Autres appels : `payments.create`, `payments.list`, `payments.payWithMobileMoney(id, { operator, phone })`,
+`payments.simulate(id, 'success' | 'failed')` (sandbox), `store.retrieve()`. `transactions` est un alias de `payments`.
+
+## Fiabilité
+
+```ts
+new FomaPayServer({ secretKey, timeoutMs: 10_000, maxRetries: 3 }); // 30 s et 2 tentatives par défaut
+```
+
+- **Nouvelles tentatives** avec attente exponentielle (0,5 s, 1 s… plafonnée à 8 s). Ne sont rejouées que les requêtes sans
+  risque : les lectures, et les créations de paiement, qui portent toujours un en-tête `Idempotency-Key`.
+  Un `429` est toujours rejoué en respectant `Retry-After`.
+- **Idempotence** : passez `idempotencyKey: 'CMD-8921'` pour qu'un appel répété par votre propre code renvoie le même paiement.
+- **Retraits** : jamais rejoués automatiquement. Après une `FomaPayNetworkError`, vérifiez l'état avant de relancer.
 
 ## Sandbox
 
@@ -94,7 +116,8 @@ Utilisez vos clés `pk_test_…` / `sk_test_…` : aucune somme réelle n'est d�
 
 ## Erreurs
 
-Chaque erreur est une `FomaPayError` avec un `code` stable et un `message` lisible :
+Chaque erreur est une `FomaPayError` avec un `code` stable et un `message` lisible. Trois sous-classes précisent l'origine :
+`FomaPayApiError` (réponse de l'API), `FomaPayNetworkError` (`ERROR_NETWORK`, `ERROR_TIMEOUT`) et `FomaPaySignatureError` (webhook).
 
 | Code | Signification |
 | --- | --- |
@@ -110,7 +133,13 @@ Chaque erreur est une `FomaPayError` avec un `code` stable et un `message` lisib
 ```bash
 npm install
 npm run build   # ESM + CJS + types, et dist/fomapay.js pour le CDN
-npm test
+npm test        # tests unitaires
+```
+
+Tests d'intégration contre le sandbox (ignorés si les variables sont absentes) :
+
+```bash
+FOMAPAY_API_URL=http://localhost:8080 FOMAPAY_TEST_SECRET_KEY=sk_test_… FOMAPAY_TEST_PUBLIC_KEY=pk_test_… npm test
 ```
 
 Licence MIT.

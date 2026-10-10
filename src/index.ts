@@ -1,13 +1,14 @@
 import {
-  CreatePaymentParams, Currency, DEFAULT_API_URL, FomaPayError, HttpClient, MobileOperator, Payment, StoreInfo, assertKey,
+  CreatePaymentParams, Currency, DEFAULT_API_URL, FomaPayError, HttpClient, HttpOptions, MobileOperator, Payment, StoreInfo, assertKey,
+  newIdempotencyKey,
 } from './core';
 import { Customization, openCheckout } from './modal';
 
-export { FomaPayError, formatAmount } from './core';
+export { FomaPayApiError, FomaPayError, FomaPayNetworkError, formatAmount } from './core';
 export type * from './core';
 export type { Customization } from './modal';
 
-export interface FomaPayOptions {
+export interface FomaPayOptions extends HttpOptions {
   /** Clé publique de la boutique (pk_test_… ou pk_live_…). */
   publicKey: string;
   /** Optionnel : sert uniquement à détecter une clé qui ne correspond pas à l'environnement voulu. */
@@ -32,7 +33,7 @@ export class FomaPay {
 
   constructor(options: FomaPayOptions) {
     assertKey(options?.publicKey, 'pk', options.environment);
-    this.http = new HttpClient(options.publicKey, options.apiUrl ?? DEFAULT_API_URL);
+    this.http = new HttpClient(options.publicKey, options.apiUrl ?? DEFAULT_API_URL, options);
   }
 
   /** Boutique liée à la clé, avec les modes de paiement que son niveau KYC autorise. */
@@ -57,7 +58,7 @@ export class FomaPay {
   // ───────── API bas niveau, pour construire sa propre interface ─────────
 
   createPayment({ idempotencyKey, ...params }: CreatePaymentParams): Promise<Payment> {
-    return this.http.request('POST', '/v1/payments', params, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {});
+    return this.http.request('POST', '/v1/payments', params, { 'Idempotency-Key': idempotencyKey ?? newIdempotencyKey() });
   }
 
   getPayment(id: string): Promise<Payment> {
@@ -74,7 +75,7 @@ export class FomaPay {
     for (;;) {
       const payment = await this.getPayment(id);
       if (payment.status !== 'pending' && payment.status !== 'processing') return payment;
-      if (Date.now() > deadline) throw new FomaPayError('ERROR_TIMEOUT', "Le paiement n'a pas été confirmé à temps.");
+      if (Date.now() > deadline) throw new FomaPayError('ERROR_PAYMENT_TIMEOUT', "Le paiement n'a pas été confirmé à temps.");
       await new Promise((r) => setTimeout(r, intervalMs));
     }
   }
